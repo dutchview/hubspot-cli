@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
 const baseURL = "https://api.hubapi.com"
@@ -351,11 +352,95 @@ func (c *Client) SearchNotes(filterGroups []map[string]interface{}, properties [
 	return c.doRequest("POST", "/crm/v3/objects/notes/search", body)
 }
 
+func (c *Client) CreateNote(body string) (json.RawMessage, error) {
+	payload := map[string]interface{}{
+		"properties": map[string]string{
+			"hs_note_body": body,
+			"hs_timestamp": time.Now().UTC().Format(time.RFC3339),
+		},
+	}
+	return c.doRequest("POST", "/crm/v3/objects/notes", payload)
+}
+
+func (c *Client) UpdateNote(noteID string, properties map[string]string) (json.RawMessage, error) {
+	body := map[string]interface{}{
+		"properties": properties,
+	}
+	return c.doRequest("PATCH", "/crm/v3/objects/notes/"+noteID, body)
+}
+
+func (c *Client) DeleteNote(noteID string) error {
+	_, err := c.doRequest("DELETE", "/crm/v3/objects/notes/"+noteID, nil)
+	return err
+}
+
+// --- Generic CRM Object CRUD ---
+
+func (c *Client) CreateObject(objectType string, properties map[string]string) (json.RawMessage, error) {
+	body := map[string]interface{}{
+		"properties": properties,
+	}
+	return c.doRequest("POST", "/crm/v3/objects/"+objectType, body)
+}
+
+func (c *Client) UpdateObject(objectType, objectID string, properties map[string]string) (json.RawMessage, error) {
+	body := map[string]interface{}{
+		"properties": properties,
+	}
+	return c.doRequest("PATCH", "/crm/v3/objects/"+objectType+"/"+objectID, body)
+}
+
+func (c *Client) DeleteObject(objectType, objectID string) error {
+	_, err := c.doRequest("DELETE", "/crm/v3/objects/"+objectType+"/"+objectID, nil)
+	return err
+}
+
 // --- Associations ---
 
 func (c *Client) GetAssociations(objectType, objectID, toObjectType string) (json.RawMessage, error) {
 	endpoint := fmt.Sprintf("/crm/v4/objects/%s/%s/associations/%s", objectType, objectID, toObjectType)
 	return c.doRequest("GET", endpoint, nil)
+}
+
+func (c *Client) CreateAssociation(fromType, fromID, toType, toID string) error {
+	// Look up the correct association type ID
+	typeID, err := c.getAssociationTypeID(fromType, toType)
+	if err != nil {
+		return err
+	}
+
+	endpoint := fmt.Sprintf("/crm/v4/objects/%s/%s/associations/%s/%s", fromType, fromID, toType, toID)
+	body := []map[string]interface{}{
+		{
+			"associationCategory": "HUBSPOT_DEFINED",
+			"associationTypeId":   typeID,
+		},
+	}
+	_, err = c.doRequest("PUT", endpoint, body)
+	return err
+}
+
+func (c *Client) getAssociationTypeID(fromType, toType string) (int, error) {
+	endpoint := fmt.Sprintf("/crm/v4/associations/%s/%s/labels", fromType, toType)
+	data, err := c.doRequest("GET", endpoint, nil)
+	if err != nil {
+		return 0, err
+	}
+	var resp struct {
+		Results []struct {
+			TypeID   int    `json:"typeId"`
+			Category string `json:"category"`
+		} `json:"results"`
+	}
+	if err := json.Unmarshal(data, &resp); err != nil {
+		return 0, err
+	}
+	for _, r := range resp.Results {
+		if r.Category == "HUBSPOT_DEFINED" {
+			return r.TypeID, nil
+		}
+	}
+	return 0, fmt.Errorf("no association type found for %s -> %s", fromType, toType)
 }
 
 // --- Engagement / Activity Timeline ---

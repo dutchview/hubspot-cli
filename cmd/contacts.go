@@ -18,6 +18,9 @@ type ContactsCmd struct {
 	List   ContactsListCmd   `cmd:"" help:"List contacts."`
 	Search ContactsSearchCmd `cmd:"" help:"Search contacts."`
 	Get    ContactsGetCmd    `cmd:"" help:"Get contact details."`
+	Create ContactsCreateCmd `cmd:"" help:"Create a contact."`
+	Update ContactsUpdateCmd `cmd:"" help:"Update a contact."`
+	Delete ContactsDeleteCmd `cmd:"" help:"Delete a contact."`
 }
 
 type ContactsListCmd struct {
@@ -164,5 +167,109 @@ func (c *ContactsGetCmd) Run(client *api.Client) error {
 	fmt.Printf("Job Title: %s\n", prop(obj.Properties, "jobtitle"))
 	fmt.Printf("Lifecycle: %s\n", prop(obj.Properties, "lifecyclestage"))
 	fmt.Printf("Created: %s\n", formatTimestamp(prop(obj.Properties, "createdate")))
+	return nil
+}
+
+type ContactsCreateCmd struct {
+	Email     string `short:"e" required:"" help:"Email address."`
+	FirstName string `help:"First name."`
+	LastName  string `help:"Last name."`
+	Phone     string `help:"Phone number."`
+	Company   string `help:"Company name."`
+	JobTitle  string `help:"Job title."`
+	JSON      bool   `short:"j" help:"Output as JSON."`
+}
+
+func (c *ContactsCreateCmd) Run(client *api.Client) error {
+	props := map[string]string{"email": c.Email}
+	if c.FirstName != "" {
+		props["firstname"] = c.FirstName
+	}
+	if c.LastName != "" {
+		props["lastname"] = c.LastName
+	}
+	if c.Phone != "" {
+		props["phone"] = c.Phone
+	}
+	if c.Company != "" {
+		props["company"] = c.Company
+	}
+	if c.JobTitle != "" {
+		props["jobtitle"] = c.JobTitle
+	}
+
+	data, err := client.CreateObject("contacts", props)
+	if err != nil {
+		return err
+	}
+	if c.JSON {
+		printRawJSON(data)
+		return nil
+	}
+	obj, _ := parseCRMObject(data)
+	fmt.Printf("Created contact %s: %s %s (%s)\n", obj.ID, c.FirstName, c.LastName, c.Email)
+	return nil
+}
+
+type ContactsUpdateCmd struct {
+	ContactID string `arg:"" help:"Contact ID."`
+	Email     string `short:"e" help:"Email address."`
+	FirstName string `help:"First name."`
+	LastName  string `help:"Last name."`
+	Phone     string `help:"Phone number."`
+	Company   string `help:"Company name."`
+	JobTitle  string `help:"Job title."`
+	JSON      bool   `short:"j" help:"Output as JSON."`
+}
+
+func (c *ContactsUpdateCmd) Run(client *api.Client) error {
+	props := map[string]string{}
+	if c.Email != "" {
+		props["email"] = c.Email
+	}
+	if c.FirstName != "" {
+		props["firstname"] = c.FirstName
+	}
+	if c.LastName != "" {
+		props["lastname"] = c.LastName
+	}
+	if c.Phone != "" {
+		props["phone"] = c.Phone
+	}
+	if c.Company != "" {
+		props["company"] = c.Company
+	}
+	if c.JobTitle != "" {
+		props["jobtitle"] = c.JobTitle
+	}
+	if len(props) == 0 {
+		return fmt.Errorf("no fields to update")
+	}
+
+	data, err := client.UpdateObject("contacts", c.ContactID, props)
+	if err != nil {
+		return err
+	}
+	if c.JSON {
+		printRawJSON(data)
+		return nil
+	}
+	fmt.Printf("Updated contact %s\n", c.ContactID)
+	return nil
+}
+
+type ContactsDeleteCmd struct {
+	ContactID string `arg:"" help:"Contact ID."`
+	Force     bool   `short:"f" help:"Skip confirmation."`
+}
+
+func (c *ContactsDeleteCmd) Run(client *api.Client) error {
+	if !c.Force && !confirmAction(fmt.Sprintf("Delete contact %s?", c.ContactID)) {
+		return nil
+	}
+	if err := client.DeleteObject("contacts", c.ContactID); err != nil {
+		return err
+	}
+	fmt.Printf("Deleted contact %s\n", c.ContactID)
 	return nil
 }

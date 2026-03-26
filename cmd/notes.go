@@ -28,6 +28,9 @@ type NotesCmd struct {
 	List   NotesListCmd   `cmd:"" help:"List notes."`
 	Search NotesSearchCmd `cmd:"" help:"Search notes by owner."`
 	Get    NotesGetCmd    `cmd:"" help:"Get note details."`
+	Create NotesCreateCmd `cmd:"" help:"Create a note."`
+	Update NotesUpdateCmd `cmd:"" help:"Update a note."`
+	Delete NotesDeleteCmd `cmd:"" help:"Delete a note."`
 }
 
 type NotesListCmd struct {
@@ -143,6 +146,90 @@ func (c *NotesGetCmd) Run(client *api.Client) error {
 	fmt.Printf("Date: %s\n", formatTimestamp(prop(obj.Properties, "hs_timestamp")))
 	fmt.Printf("Owner: %s\n", prop(obj.Properties, "hubspot_owner_id"))
 	fmt.Printf("\n%s\n", body)
+	return nil
+}
+
+type NotesCreateCmd struct {
+	Body    string `arg:"" help:"Note body text."`
+	Company string `help:"Associate with company ID."`
+	Contact string `help:"Associate with contact ID."`
+	Deal    string `help:"Associate with deal ID."`
+	Ticket  string `help:"Associate with ticket ID."`
+	JSON    bool   `short:"j" help:"Output as JSON."`
+}
+
+func (c *NotesCreateCmd) Run(client *api.Client) error {
+	data, err := client.CreateNote(c.Body)
+	if err != nil {
+		return err
+	}
+
+	obj, err := parseCRMObject(data)
+	if err != nil {
+		return err
+	}
+
+	// Associate with objects
+	associations := []struct {
+		objectType string
+		objectID   string
+	}{
+		{"companies", c.Company},
+		{"contacts", c.Contact},
+		{"deals", c.Deal},
+		{"tickets", c.Ticket},
+	}
+
+	for _, a := range associations {
+		if a.objectID != "" {
+			if err := client.CreateAssociation("notes", obj.ID, a.objectType, a.objectID); err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: failed to associate with %s %s: %v\n", a.objectType, a.objectID, err)
+			}
+		}
+	}
+
+	if c.JSON {
+		printRawJSON(data)
+		return nil
+	}
+
+	fmt.Printf("Created note %s\n", obj.ID)
+	return nil
+}
+
+type NotesUpdateCmd struct {
+	NoteID string `arg:"" help:"Note ID."`
+	Body   string `short:"b" required:"" help:"New note body text."`
+	JSON   bool   `short:"j" help:"Output as JSON."`
+}
+
+func (c *NotesUpdateCmd) Run(client *api.Client) error {
+	props := map[string]string{"hs_note_body": c.Body}
+	data, err := client.UpdateNote(c.NoteID, props)
+	if err != nil {
+		return err
+	}
+	if c.JSON {
+		printRawJSON(data)
+		return nil
+	}
+	fmt.Printf("Updated note %s\n", c.NoteID)
+	return nil
+}
+
+type NotesDeleteCmd struct {
+	NoteID string `arg:"" help:"Note ID."`
+	Force  bool   `short:"f" help:"Skip confirmation."`
+}
+
+func (c *NotesDeleteCmd) Run(client *api.Client) error {
+	if !c.Force && !confirmAction(fmt.Sprintf("Delete note %s?", c.NoteID)) {
+		return nil
+	}
+	if err := client.DeleteNote(c.NoteID); err != nil {
+		return err
+	}
+	fmt.Printf("Deleted note %s\n", c.NoteID)
 	return nil
 }
 

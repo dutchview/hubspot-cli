@@ -18,6 +18,9 @@ type DealsCmd struct {
 	List   DealsListCmd   `cmd:"" help:"List deals."`
 	Search DealsSearchCmd `cmd:"" help:"Search deals."`
 	Get    DealsGetCmd    `cmd:"" help:"Get deal details."`
+	Create DealsCreateCmd `cmd:"" help:"Create a deal."`
+	Update DealsUpdateCmd `cmd:"" help:"Update a deal."`
+	Delete DealsDeleteCmd `cmd:"" help:"Delete a deal."`
 }
 
 type DealsListCmd struct {
@@ -164,5 +167,101 @@ func (c *DealsGetCmd) Run(client *api.Client) error {
 	fmt.Printf("Owner: %s\n", prop(obj.Properties, "hubspot_owner_id"))
 	fmt.Printf("Close Date: %s\n", formatTimestamp(prop(obj.Properties, "closedate")))
 	fmt.Printf("Created: %s\n", formatTimestamp(prop(obj.Properties, "createdate")))
+	return nil
+}
+
+type DealsCreateCmd struct {
+	Name     string `required:"" help:"Deal name."`
+	Amount   string `help:"Deal amount."`
+	Stage    string `help:"Deal stage."`
+	Pipeline string `short:"p" help:"Pipeline ID."`
+	Owner    string `short:"o" help:"Owner ID."`
+	JSON     bool   `short:"j" help:"Output as JSON."`
+}
+
+func (c *DealsCreateCmd) Run(client *api.Client) error {
+	props := map[string]string{"dealname": c.Name}
+	if c.Amount != "" {
+		props["amount"] = c.Amount
+	}
+	if c.Stage != "" {
+		props["dealstage"] = c.Stage
+	}
+	if c.Pipeline != "" {
+		props["pipeline"] = c.Pipeline
+	}
+	if c.Owner != "" {
+		props["hubspot_owner_id"] = c.Owner
+	}
+
+	data, err := client.CreateObject("deals", props)
+	if err != nil {
+		return err
+	}
+	if c.JSON {
+		printRawJSON(data)
+		return nil
+	}
+	obj, _ := parseCRMObject(data)
+	fmt.Printf("Created deal %s: %s\n", obj.ID, c.Name)
+	return nil
+}
+
+type DealsUpdateCmd struct {
+	DealID   string `arg:"" help:"Deal ID."`
+	Name     string `help:"Deal name."`
+	Amount   string `help:"Deal amount."`
+	Stage    string `help:"Deal stage."`
+	Pipeline string `short:"p" help:"Pipeline ID."`
+	Owner    string `short:"o" help:"Owner ID."`
+	JSON     bool   `short:"j" help:"Output as JSON."`
+}
+
+func (c *DealsUpdateCmd) Run(client *api.Client) error {
+	props := map[string]string{}
+	if c.Name != "" {
+		props["dealname"] = c.Name
+	}
+	if c.Amount != "" {
+		props["amount"] = c.Amount
+	}
+	if c.Stage != "" {
+		props["dealstage"] = c.Stage
+	}
+	if c.Pipeline != "" {
+		props["pipeline"] = c.Pipeline
+	}
+	if c.Owner != "" {
+		props["hubspot_owner_id"] = c.Owner
+	}
+	if len(props) == 0 {
+		return fmt.Errorf("no fields to update")
+	}
+
+	data, err := client.UpdateObject("deals", c.DealID, props)
+	if err != nil {
+		return err
+	}
+	if c.JSON {
+		printRawJSON(data)
+		return nil
+	}
+	fmt.Printf("Updated deal %s\n", c.DealID)
+	return nil
+}
+
+type DealsDeleteCmd struct {
+	DealID string `arg:"" help:"Deal ID."`
+	Force  bool   `short:"f" help:"Skip confirmation."`
+}
+
+func (c *DealsDeleteCmd) Run(client *api.Client) error {
+	if !c.Force && !confirmAction(fmt.Sprintf("Delete deal %s?", c.DealID)) {
+		return nil
+	}
+	if err := client.DeleteObject("deals", c.DealID); err != nil {
+		return err
+	}
+	fmt.Printf("Deleted deal %s\n", c.DealID)
 	return nil
 }

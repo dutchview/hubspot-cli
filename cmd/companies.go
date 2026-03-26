@@ -18,6 +18,9 @@ type CompaniesCmd struct {
 	List   CompaniesListCmd   `cmd:"" help:"List companies."`
 	Search CompaniesSearchCmd `cmd:"" help:"Search companies."`
 	Get    CompaniesGetCmd    `cmd:"" help:"Get company details."`
+	Create CompaniesCreateCmd `cmd:"" help:"Create a company."`
+	Update CompaniesUpdateCmd `cmd:"" help:"Update a company."`
+	Delete CompaniesDeleteCmd `cmd:"" help:"Delete a company."`
 }
 
 type CompaniesListCmd struct {
@@ -154,5 +157,109 @@ func (c *CompaniesGetCmd) Run(client *api.Client) error {
 	fmt.Printf("Employees: %s\n", prop(obj.Properties, "numberofemployees"))
 	fmt.Printf("Revenue: %s\n", prop(obj.Properties, "annualrevenue"))
 	fmt.Printf("Created: %s\n", formatTimestamp(prop(obj.Properties, "createdate")))
+	return nil
+}
+
+type CompaniesCreateCmd struct {
+	Name     string `required:"" help:"Company name."`
+	Domain   string `help:"Website domain."`
+	Industry string `help:"Industry."`
+	City     string `help:"City."`
+	Country  string `help:"Country."`
+	Phone    string `help:"Phone number."`
+	JSON     bool   `short:"j" help:"Output as JSON."`
+}
+
+func (c *CompaniesCreateCmd) Run(client *api.Client) error {
+	props := map[string]string{"name": c.Name}
+	if c.Domain != "" {
+		props["domain"] = c.Domain
+	}
+	if c.Industry != "" {
+		props["industry"] = c.Industry
+	}
+	if c.City != "" {
+		props["city"] = c.City
+	}
+	if c.Country != "" {
+		props["country"] = c.Country
+	}
+	if c.Phone != "" {
+		props["phone"] = c.Phone
+	}
+
+	data, err := client.CreateObject("companies", props)
+	if err != nil {
+		return err
+	}
+	if c.JSON {
+		printRawJSON(data)
+		return nil
+	}
+	obj, _ := parseCRMObject(data)
+	fmt.Printf("Created company %s: %s\n", obj.ID, c.Name)
+	return nil
+}
+
+type CompaniesUpdateCmd struct {
+	CompanyID string `arg:"" help:"Company ID."`
+	Name      string `help:"Company name."`
+	Domain    string `help:"Website domain."`
+	Industry  string `help:"Industry."`
+	City      string `help:"City."`
+	Country   string `help:"Country."`
+	Phone     string `help:"Phone number."`
+	JSON      bool   `short:"j" help:"Output as JSON."`
+}
+
+func (c *CompaniesUpdateCmd) Run(client *api.Client) error {
+	props := map[string]string{}
+	if c.Name != "" {
+		props["name"] = c.Name
+	}
+	if c.Domain != "" {
+		props["domain"] = c.Domain
+	}
+	if c.Industry != "" {
+		props["industry"] = c.Industry
+	}
+	if c.City != "" {
+		props["city"] = c.City
+	}
+	if c.Country != "" {
+		props["country"] = c.Country
+	}
+	if c.Phone != "" {
+		props["phone"] = c.Phone
+	}
+	if len(props) == 0 {
+		return fmt.Errorf("no fields to update")
+	}
+
+	data, err := client.UpdateObject("companies", c.CompanyID, props)
+	if err != nil {
+		return err
+	}
+	if c.JSON {
+		printRawJSON(data)
+		return nil
+	}
+	fmt.Printf("Updated company %s\n", c.CompanyID)
+	return nil
+}
+
+type CompaniesDeleteCmd struct {
+	CompanyID string `arg:"" help:"Company ID."`
+	Force     bool   `short:"f" help:"Skip confirmation."`
+}
+
+func (c *CompaniesDeleteCmd) Run(client *api.Client) error {
+	if !c.Force && !confirmAction(fmt.Sprintf("Delete company %s?", c.CompanyID)) {
+		return nil
+	}
+	if err := client.DeleteObject("companies", c.CompanyID); err != nil {
+		return err
+	}
+	fmt.Printf("Deleted company %s\n", c.CompanyID)
 	return nil
 }

@@ -10,6 +10,10 @@ A command-line interface for HubSpot CRM, built in Go.
 brew install dutchview/tap/hubspot
 ```
 
+### Download binary
+
+Download the latest release from [GitHub Releases](https://github.com/dutchview/hubspot-cli/releases) for your platform (macOS, Linux, Windows).
+
 ### From source
 
 ```bash
@@ -35,13 +39,14 @@ This CLI authenticates using a **Private App access token**:
 3. Navigate to **Development > Legacy Apps > Private Apps**
 4. Click **Create a private app**, name it (e.g. "CLI Access")
 5. Go to the **Scopes** tab and enable the scopes you need:
-   - `crm.objects.contacts.read` — contacts commands
-   - `crm.objects.companies.read` — companies commands
-   - `crm.objects.deals.read` — deals commands
+   - `crm.objects.contacts.read` / `.write` — contacts commands
+   - `crm.objects.companies.read` / `.write` — companies commands
+   - `crm.objects.deals.read` / `.write` — deals commands
    - `tickets` — ticket read/write
    - `crm.objects.owners.read` — owners commands
    - `conversations.read` — reading conversations
    - `conversations.write` — replying/commenting on conversations
+   - `files` — file uploads (note attachments)
 6. Click **Create app**, then **Continue creating**
 7. Copy the **Access token** shown on the next screen
 
@@ -126,27 +131,77 @@ hubspot conversations reply 12345678 "Hello" --recipient customer@example.com
 ### Contacts
 
 ```bash
+# List and search
 hubspot contacts list
-hubspot contacts list -n 50
 hubspot contacts search "john"
 hubspot contacts get 123456
+
+# Create
+hubspot contacts create -e john@example.com --first-name John --last-name Doe
+
+# Update
+hubspot contacts update 123456 --phone "+31612345678"
+
+# Delete
+hubspot contacts delete 123456
 ```
 
 ### Companies
 
 ```bash
+# List and search
 hubspot companies list
 hubspot companies search "dutchview"
 hubspot companies get 123456
+
+# Create
+hubspot companies create --name "Acme Corp" --domain acme.com --city Amsterdam
+
+# Update
+hubspot companies update 123456 --name "New Name"
+
+# Delete
+hubspot companies delete 123456
 ```
 
 ### Deals
 
 ```bash
+# List and search
 hubspot deals list
 hubspot deals search "project name"
 hubspot deals search --stage closedwon
 hubspot deals get 123456
+
+# Create
+hubspot deals create --name "New deal" --amount 10000
+
+# Update
+hubspot deals update 123456 --stage closedwon
+
+# Delete
+hubspot deals delete 123456
+```
+
+### Notes
+
+```bash
+# List and search
+hubspot notes list
+hubspot notes list --owner 574704108
+hubspot notes search "robert greidanus"
+hubspot notes get 479733149889
+
+# Create (with optional associations and file attachments)
+hubspot notes create "Note text" --company 123
+hubspot notes create "See attached" --company 123 --file ./report.pdf
+hubspot notes create "Multi-file" --file ./a.pdf --file ./b.png --contact 456
+
+# Update
+hubspot notes update 123456 -b "Updated text"
+
+# Delete
+hubspot notes delete 123456
 ```
 
 ### Owners

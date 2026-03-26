@@ -20,6 +20,7 @@ var CLI struct {
 	Contacts      cmd.ContactsCmd      `cmd:"" help:"Manage contacts."`
 	Companies     cmd.CompaniesCmd     `cmd:"" help:"Manage companies."`
 	Deals         cmd.DealsCmd         `cmd:"" help:"Manage deals."`
+	Notes         cmd.NotesCmd         `cmd:"" help:"Manage notes/engagements."`
 	Owners        cmd.OwnersCmd        `cmd:"" help:"Manage owners/users."`
 	Pipelines     cmd.PipelinesCmd     `cmd:"" help:"List pipelines and stages."`
 	Configure     cmd.ConfigureCmd     `cmd:"" help:"Show configuration help."`

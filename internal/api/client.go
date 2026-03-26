@@ -310,6 +310,47 @@ func (c *Client) GetPipelineStages(objectType, pipelineID string) (json.RawMessa
 	return c.doRequest("GET", "/crm/v3/pipelines/"+objectType+"/"+pipelineID+"/stages", nil)
 }
 
+// --- Notes ---
+
+func (c *Client) GetNote(noteID string, properties []string) (json.RawMessage, error) {
+	params := url.Values{}
+	if len(properties) > 0 {
+		params.Set("properties", strings.Join(properties, ","))
+	}
+	endpoint := "/crm/v3/objects/notes/" + noteID
+	if len(params) > 0 {
+		endpoint += "?" + params.Encode()
+	}
+	return c.doRequest("GET", endpoint, nil)
+}
+
+func (c *Client) ListNotes(limit int, properties []string, after string) (json.RawMessage, error) {
+	params := url.Values{}
+	params.Set("limit", fmt.Sprintf("%d", limit))
+	if len(properties) > 0 {
+		params.Set("properties", strings.Join(properties, ","))
+	}
+	if after != "" {
+		params.Set("after", after)
+	}
+	return c.doRequest("GET", "/crm/v3/objects/notes?"+params.Encode(), nil)
+}
+
+func (c *Client) SearchNotes(filterGroups []map[string]interface{}, properties []string, limit int, after int, sorts []map[string]string) (json.RawMessage, error) {
+	body := map[string]interface{}{
+		"filterGroups": filterGroups,
+		"properties":   properties,
+		"limit":        limit,
+	}
+	if after > 0 {
+		body["after"] = after
+	}
+	if len(sorts) > 0 {
+		body["sorts"] = sorts
+	}
+	return c.doRequest("POST", "/crm/v3/objects/notes/search", body)
+}
+
 // --- Associations ---
 
 func (c *Client) GetAssociations(objectType, objectID, toObjectType string) (json.RawMessage, error) {

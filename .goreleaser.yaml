@@ -1,0 +1,52 @@
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - binary: hubspot
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
+archives:
+  - format: tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        format: zip
+
+brews:
+  - repository:
+      owner: dutchview
+      name: homebrew-tap
+      token: "{{ .Env.GITHUB_TOKEN }}"
+    directory: Formula
+    name: hubspot
+    homepage: "https://github.com/dutchview/hubspot-cli"
+    description: "Command-line interface for HubSpot CRM"
+    license: "MIT"
+    install: |
+      bin.install "hubspot"
+    test: |
+      system "#{bin}/hubspot", "--version"
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"

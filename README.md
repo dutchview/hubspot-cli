@@ -2,34 +2,13 @@
 
 A command-line interface for HubSpot CRM, built in Go.
 
-## Prerequisites
-
-- [Go 1.21+](https://go.dev/dl/) (for building from source)
-- A HubSpot account with access to create Private Apps
-
-## Getting a HubSpot Access Token
-
-This CLI authenticates using a **Private App access token**. To create one:
-
-1. Log in to your [HubSpot account](https://app.hubspot.com/)
-2. Go to **Settings** (gear icon top-right)
-3. In the left sidebar, navigate to **Integrations > Private Apps**
-4. Click **Create a private app**
-5. Give it a name (e.g. "CLI Access")
-6. Go to the **Scopes** tab and enable the scopes you need:
-   - `crm.objects.contacts.read` — for contacts commands
-   - `crm.objects.companies.read` — for companies commands
-   - `crm.objects.deals.read` — for deals commands
-   - `tickets` — for ticket read/write
-   - `crm.objects.owners.read` — for owners commands
-   - `conversations.read` — for reading conversations
-   - `conversations.write` — for replying/commenting on conversations
-7. Click **Create app**, then **Continue creating**
-8. Copy the **Access token** shown on the next screen
-
-> **Note:** You only need to enable scopes for the commands you plan to use.
-
 ## Installation
+
+### Homebrew (recommended)
+
+```bash
+brew install dutchview/tap/hubspot
+```
 
 ### From source
 
@@ -45,11 +24,32 @@ cd hubspot-cli
 go build -o hubspot .
 ```
 
-## Configuration
+## Setup
 
-### Option 1: Config file (recommended)
+### 1. Get a HubSpot Access Token
 
-Create the config directory and file:
+This CLI authenticates using a **Private App access token**:
+
+1. Log in to your [HubSpot account](https://app.hubspot.com/)
+2. Go to **Settings** (gear icon top-right)
+3. Navigate to **Integrations > Private Apps**
+4. Click **Create a private app**, name it (e.g. "CLI Access")
+5. Go to the **Scopes** tab and enable the scopes you need:
+   - `crm.objects.contacts.read` — contacts commands
+   - `crm.objects.companies.read` — companies commands
+   - `crm.objects.deals.read` — deals commands
+   - `tickets` — ticket read/write
+   - `crm.objects.owners.read` — owners commands
+   - `conversations.read` — reading conversations
+   - `conversations.write` — replying/commenting on conversations
+6. Click **Create app**, then **Continue creating**
+7. Copy the **Access token** shown on the next screen
+
+> You only need to enable scopes for the commands you plan to use.
+
+### 2. Configure the CLI
+
+**Option A: Config file (recommended)**
 
 ```bash
 mkdir -p ~/.config/hubspot
@@ -57,21 +57,19 @@ echo "HUBSPOT_ACCESS_TOKEN=your_token_here" > ~/.config/hubspot/.env
 chmod 600 ~/.config/hubspot/.env
 ```
 
-### Option 2: Environment variable
+**Option B: Environment variable**
 
 ```bash
 export HUBSPOT_ACCESS_TOKEN=your_token_here
 ```
 
-### Option 3: Custom config file
+**Option C: Custom config file**
 
 ```bash
 hubspot --config /path/to/your/.env tickets list
 ```
 
-### Config load order
-
-Configuration is loaded from these locations (later values override earlier):
+Config is loaded from (later values override earlier):
 
 1. `~/.config/hubspot/.env`
 2. `.env` in current directory

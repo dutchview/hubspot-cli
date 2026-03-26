@@ -32,7 +32,7 @@ This CLI authenticates using a **Private App access token**:
 
 1. Log in to your [HubSpot account](https://app.hubspot.com/)
 2. Go to **Settings** (gear icon top-right)
-3. Navigate to **Integrations > Private Apps**
+3. Navigate to **Integrations > Connected Apps > Private Apps**
 4. Click **Create a private app**, name it (e.g. "CLI Access")
 5. Go to the **Scopes** tab and enable the scopes you need:
    - `crm.objects.contacts.read` — contacts commands

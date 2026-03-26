@@ -150,16 +150,28 @@ func (c *NotesGetCmd) Run(client *api.Client) error {
 }
 
 type NotesCreateCmd struct {
-	Body    string `arg:"" help:"Note body text."`
-	Company string `help:"Associate with company ID."`
-	Contact string `help:"Associate with contact ID."`
-	Deal    string `help:"Associate with deal ID."`
-	Ticket  string `help:"Associate with ticket ID."`
-	JSON    bool   `short:"j" help:"Output as JSON."`
+	Body    string   `arg:"" help:"Note body text."`
+	Company string   `help:"Associate with company ID."`
+	Contact string   `help:"Associate with contact ID."`
+	Deal    string   `help:"Associate with deal ID."`
+	Ticket  string   `help:"Associate with ticket ID."`
+	File    []string `help:"File path to attach (can be repeated)." type:"path"`
+	JSON    bool     `short:"j" help:"Output as JSON."`
 }
 
 func (c *NotesCreateCmd) Run(client *api.Client) error {
-	data, err := client.CreateNote(c.Body)
+	var attachmentIDs []string
+	for _, f := range c.File {
+		fmt.Fprintf(os.Stderr, "Uploading %s...\n", f)
+		fileID, err := client.UploadFile(f)
+		if err != nil {
+			return fmt.Errorf("upload %s: %w", f, err)
+		}
+		fmt.Fprintf(os.Stderr, "Uploaded %s (ID: %s)\n", f, fileID)
+		attachmentIDs = append(attachmentIDs, fileID)
+	}
+
+	data, err := client.CreateNote(c.Body, attachmentIDs)
 	if err != nil {
 		return err
 	}

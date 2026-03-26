@@ -5,8 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -352,14 +355,81 @@ func (c *Client) SearchNotes(filterGroups []map[string]interface{}, properties [
 	return c.doRequest("POST", "/crm/v3/objects/notes/search", body)
 }
 
-func (c *Client) CreateNote(body string) (json.RawMessage, error) {
+func (c *Client) CreateNote(body string, attachmentIDs []string) (json.RawMessage, error) {
+	props := map[string]string{
+		"hs_note_body": body,
+		"hs_timestamp": time.Now().UTC().Format(time.RFC3339),
+	}
+	if len(attachmentIDs) > 0 {
+		props["hs_attachment_ids"] = strings.Join(attachmentIDs, ";")
+	}
 	payload := map[string]interface{}{
-		"properties": map[string]string{
-			"hs_note_body": body,
-			"hs_timestamp": time.Now().UTC().Format(time.RFC3339),
-		},
+		"properties": props,
 	}
 	return c.doRequest("POST", "/crm/v3/objects/notes", payload)
+}
+
+func (c *Client) UploadFile(filePath string) (string, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return "", fmt.Errorf("open file: %w", err)
+	}
+	defer file.Close()
+
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+
+	part, err := writer.CreateFormFile("file", filepath.Base(filePath))
+	if err != nil {
+		return "", fmt.Errorf("create form file: %w", err)
+	}
+	if _, err := io.Copy(part, file); err != nil {
+		return "", fmt.Errorf("copy file: %w", err)
+	}
+
+	optsPart, err := writer.CreateFormField("options")
+	if err != nil {
+		return "", fmt.Errorf("create options field: %w", err)
+	}
+	optsPart.Write([]byte(`{"access":"PRIVATE"}`))
+
+	folderPart, err := writer.CreateFormField("folderPath")
+	if err != nil {
+		return "", fmt.Errorf("create folder field: %w", err)
+	}
+	folderPart.Write([]byte("/hubspot-cli-uploads"))
+
+	writer.Close()
+
+	req, err := http.NewRequest("POST", baseURL+"/files/v3/files", &buf)
+	if err != nil {
+		return "", fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("upload request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("read response: %w", err)
+	}
+
+	if resp.StatusCode >= 400 {
+		return "", fmt.Errorf("upload failed (%d): %s", resp.StatusCode, string(respBody))
+	}
+
+	var result struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return "", fmt.Errorf("parse response: %w", err)
+	}
+	return result.ID, nil
 }
 
 func (c *Client) UpdateNote(noteID string, properties map[string]string) (json.RawMessage, error) {

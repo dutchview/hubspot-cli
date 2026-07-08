@@ -14,6 +14,44 @@ type ConversationsCmd struct {
 	Reply    ConvReplyCmd    `cmd:"" help:"Send a reply to a customer."`
 }
 
+// deliveryIdentifier is the HubSpot Conversations v3 representation of an
+// address (email, etc.). The API returns it as an object, not a bare string.
+type deliveryIdentifier struct {
+	Type  string `json:"type"`
+	Value string `json:"value"`
+}
+
+type messageSender struct {
+	ActorID            string             `json:"actorId"`
+	Name               string             `json:"name"`
+	DeliveryIdentifier deliveryIdentifier `json:"deliveryIdentifier"`
+}
+
+type messageRecipient struct {
+	RecipientField     string             `json:"recipientField"`
+	DeliveryIdentifier deliveryIdentifier `json:"deliveryIdentifier"`
+}
+
+type threadMessage struct {
+	ID         string             `json:"id"`
+	Type       string             `json:"type"`
+	CreatedAt  string             `json:"createdAt"`
+	Direction  string             `json:"direction"`
+	Senders    []messageSender    `json:"senders"`
+	Recipients []messageRecipient `json:"recipients"`
+	Text       string             `json:"text"`
+	Body       *struct {
+		Text    string `json:"text"`
+		Content string `json:"content"`
+	} `json:"body"`
+	ChannelID        string `json:"channelId"`
+	ChannelAccountID string `json:"channelAccountId"`
+}
+
+type threadMessagesResponse struct {
+	Results []threadMessage `json:"results"`
+}
+
 type ConvMessagesCmd struct {
 	ThreadID string `arg:"" help:"Conversation thread ID."`
 	JSON     bool   `short:"j" help:"Output as JSON."`
@@ -30,28 +68,7 @@ func (c *ConvMessagesCmd) Run(client *api.Client) error {
 		return nil
 	}
 
-	var resp struct {
-		Results []struct {
-			ID        string `json:"id"`
-			Type      string `json:"type"`
-			CreatedAt string `json:"createdAt"`
-			Direction string `json:"direction"`
-			Senders   []struct {
-				ActorID             string `json:"actorId"`
-				Name                string `json:"name"`
-				DeliveryIdentifier  string `json:"deliveryIdentifier"`
-			} `json:"senders"`
-			Recipients []struct {
-				RecipientField      string `json:"recipientField"`
-				DeliveryIdentifier  string `json:"deliveryIdentifier"`
-			} `json:"recipients"`
-			Text string `json:"text"`
-			Body *struct {
-				Text    string `json:"text"`
-				Content string `json:"content"`
-			} `json:"body"`
-		} `json:"results"`
-	}
+	var resp threadMessagesResponse
 	if err := json.Unmarshal(data, &resp); err != nil {
 		return err
 	}
@@ -72,8 +89,8 @@ func (c *ConvMessagesCmd) Run(client *api.Client) error {
 			s := msg.Senders[0]
 			if s.Name != "" {
 				sender = s.Name
-			} else if s.DeliveryIdentifier != "" {
-				sender = s.DeliveryIdentifier
+			} else if s.DeliveryIdentifier.Value != "" {
+				sender = s.DeliveryIdentifier.Value
 			} else {
 				sender = s.ActorID
 			}
@@ -121,11 +138,11 @@ func (c *ConvCommentCmd) Run(client *api.Client) error {
 }
 
 type ConvReplyCmd struct {
-	ThreadID       string `arg:"" help:"Conversation thread ID."`
-	Text           string `arg:"" help:"Reply text."`
-	SenderActorID  string `help:"Sender actor ID (e.g. A-46807710). Auto-detected if not set."`
-	Recipient      string `help:"Recipient email. Auto-detected from thread if not set."`
-	JSON           bool   `short:"j" help:"Output as JSON."`
+	ThreadID      string `arg:"" help:"Conversation thread ID."`
+	Text          string `arg:"" help:"Reply text."`
+	SenderActorID string `help:"Sender actor ID (e.g. A-46807710). Auto-detected if not set."`
+	Recipient     string `help:"Recipient email. Auto-detected from thread if not set."`
+	JSON          bool   `short:"j" help:"Output as JSON."`
 }
 
 func (c *ConvReplyCmd) Run(client *api.Client) error {
@@ -135,22 +152,7 @@ func (c *ConvReplyCmd) Run(client *api.Client) error {
 		return fmt.Errorf("failed to read thread for auto-detection: %w", err)
 	}
 
-	var msgs struct {
-		Results []struct {
-			Type      string `json:"type"`
-			Direction string `json:"direction"`
-			Senders   []struct {
-				ActorID            string `json:"actorId"`
-				DeliveryIdentifier string `json:"deliveryIdentifier"`
-			} `json:"senders"`
-			Recipients []struct {
-				RecipientField     string `json:"recipientField"`
-				DeliveryIdentifier string `json:"deliveryIdentifier"`
-			} `json:"recipients"`
-			ChannelID        string `json:"channelId"`
-			ChannelAccountID string `json:"channelAccountId"`
-		} `json:"results"`
-	}
+	var msgs threadMessagesResponse
 	if err := json.Unmarshal(msgData, &msgs); err != nil {
 		return fmt.Errorf("parse thread messages: %w", err)
 	}
@@ -174,7 +176,7 @@ func (c *ConvReplyCmd) Run(client *api.Client) error {
 		}
 		// Get recipient from INCOMING messages (the customer)
 		if recipient == "" && strings.EqualFold(msg.Direction, "INCOMING") && len(msg.Senders) > 0 {
-			if email := msg.Senders[0].DeliveryIdentifier; email != "" {
+			if email := msg.Senders[0].DeliveryIdentifier.Value; email != "" {
 				recipient = email
 			}
 		}
@@ -190,10 +192,13 @@ func (c *ConvReplyCmd) Run(client *api.Client) error {
 		channelID = "1002" // default to email
 	}
 
-	recipients := []map[string]string{
+	recipients := []map[string]interface{}{
 		{
-			"recipientField":     "TO",
-			"deliveryIdentifier": recipient,
+			"recipientField": "TO",
+			"deliveryIdentifier": map[string]string{
+				"type":  "HS_EMAIL_ADDRESS",
+				"value": recipient,
+			},
 		},
 	}
 

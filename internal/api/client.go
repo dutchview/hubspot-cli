@@ -163,7 +163,7 @@ func (c *Client) AddComment(threadID string, text string, richText string) (json
 	return c.doRequest("POST", "/conversations/v3/conversations/threads/"+threadID+"/messages", body)
 }
 
-func (c *Client) SendMessage(threadID string, text string, richText string, senderActorID string, channelID string, channelAccountID string, recipients []map[string]string) (json.RawMessage, error) {
+func (c *Client) SendMessage(threadID string, text string, richText string, senderActorID string, channelID string, channelAccountID string, recipients []map[string]interface{}) (json.RawMessage, error) {
 	body := map[string]interface{}{
 		"type":             "MESSAGE",
 		"text":             text,
